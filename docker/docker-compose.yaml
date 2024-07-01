@@ -1,0 +1,55 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://172.17.0.1:9092 # kafka advertise its address
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  mongo:
+    image: mongo:3.6.23
+    container_name: mongodb-3.6.23
+    restart: always
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb-data:/data/db
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    command: ["--log-level=debug"]
+    container_name: jaeger
+    ports:
+      - '16686:16686' # Jaeger UI
+      - '6831:6831/udp' # Jaeger agent service, which receives spans sent over UDP.
+      - '4317:4317'         # grpc
+      - '4318:4318'       # http
+      - '55680:55680'  # Jaeger collector service
+      - "14250:14250"     # For gRPC
+      - "14268:14268"     # For HTTP collector
+      - "14269:14269"     # For HTTP collector (cassandra)
+      - "9411:9411"       # For Zipkin
+    environment:
+      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
+      - COLLECTOR_OTLP_ENABLED=true  # Enable OTLP on the collector
+#      - COLLECTOR_OTLP_GRPC_PORT=14250
+#      - COLLECTOR_OTLP_HTTP_PORT=55681
+
+volumes:
+  mongodb-data:
