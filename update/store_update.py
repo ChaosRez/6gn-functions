@@ -1,15 +1,15 @@
 from pymongo import MongoClient
 from datetime import datetime
 
+# Create a MongoClient to the running MongoDB instance
+host = "172.17.0.1"  # TODO use ENV variables
+client = MongoClient(f'mongodb://{host}:27017/')
+
+# Access the 'trajectories' collection in the 'sixGNext' database
+db = client.sixGNext
+trajectories = db.trajectories
+
 def store_update(data):
-    # Create a MongoClient to the running MongoDB instance
-    host = "172.17.0.1"  # TODO use ENV variables
-    client = MongoClient(f'mongodb://{host}:27017/')
-
-    # Access the 'trajectories' collection in the 'sixGNext' database
-    db = client.sixGNext
-    trajectories = db.trajectories
-
     # Add a 'created_at' key to all 'data' elements with the current timestamp
     created_time = datetime.now()
     for element in data:
