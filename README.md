@@ -11,5 +11,6 @@ find specific trajectories that are generated. This key is added by "mutate" fun
 
 ### Notes
 - function container in tinyfaas doesn't have build tools for some python libraries, so we need to build the wheel in a separate environment.
+- Note tracing has sampling.always_on, so it will be costly
 - Compass rose is used as reference for directions:
 ![Compass Rose](Compass-rose-32-pt.svg)

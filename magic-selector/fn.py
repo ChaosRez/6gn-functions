@@ -26,28 +26,37 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input: A JSON string that represents a dictionary with trajectory set candidates 'data' and 'meta' keys.
     output: calls the risk evaluation function with the selected trajectory
     """
-    with tracer.start_span('parse_input', attributes={"invoke_count": Counter.increment_count()}):
+    with tracer.start_span('fn') as main_span:
+        main_span.set_attribute("invoke_count", Counter.increment_count())
+        # main_span.set_attribute("input", input)
         logger.info(f'[magicselector fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
-        parsed_input = json.loads(input)
-        logger.debug(f'[magicselector fn] Parsed input: {parsed_input}')
+        with tracer.start_span('parse_input'):
+            parsed_input = json.loads(input)
+            logger.debug(f'[magicselector fn] Parsed input: {parsed_input}')
 
-        data = parsed_input.get('data', [])
-        meta = parsed_input.get('meta', {})
+            data = parsed_input.get('data', [])
+            meta = parsed_input.get('meta', {})
 
-    # select one of the candidate trajectories
-    with tracer.start_span('select_trajectory', attributes={"invoke_count": Counter.get_count()}):
-        new_data = data[0]  # TODO: implement a selection algorithm
-        logger.info(f'[magicselector fn] chosen trajectory set: {new_data}')
+        # select one of the candidate trajectories
+        with tracer.start_span('select_trajectory'):
+            new_data = data[0]  # TODO: implement a selection algorithm
+            main_span.set_attribute("chosen_trajectory", new_data)
+            logger.info(f'[magicselector fn] chosen trajectory set: {new_data}')
 
-        # change origin of the data if it is 'self_report'
-        meta['origin'] = "system"
+            # change origin of the data if it is 'self_report'
+            meta['origin'] = "system"
 
-    # call risk evaluation function
-    with tracer.start_span('post_risk_eval', attributes={"invoke_count": Counter.get_count()}):
-        post_risk_eval(new_data, meta)
+        # call risk evaluation function
+        with tracer.start_span('post_risk_eval',) as post_risk_eval_span:
+            try:
+                r = post_risk_eval(new_data, meta)
+                post_risk_eval_span.set_attribute("response_code", r.status_code)
+            except Exception as e:
+                logger.error(f'[magicselector fn] Error in post_risk_eval: {e}')
+                post_risk_eval_span.set_attribute("error", True)
 
-    return f"new trajectory: {new_data}"
+        return f"new trajectory: {new_data}"
 
 
 class Counter:
