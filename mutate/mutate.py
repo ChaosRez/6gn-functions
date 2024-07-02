@@ -36,6 +36,6 @@ def generate_mutations(trajectories, abilities):
 
         # Add the new candidate to the list of candidates
         new_candidates.append(mutated_trajectories)
-        logger.info(f'[mutate fn] added new candidate: {mutated_trajectories}')
+        logger.info(f'[mutate fn] mutated trajectory of new candidate: {new_trajectory}')
 
     return new_candidates
