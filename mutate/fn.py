@@ -22,6 +22,12 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("mutate").tracer
 
+# Load abilities from JSON file
+with open('abilities.json', 'r') as f:
+    abilities = json.load(f)
+logger.debug(f'[mutate fn] Abilities: {abilities}')
+
+
 # FIXME: the output's 'direction' and 'speed' values can be long floats. make them int afterward?
 def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     """
@@ -32,10 +38,6 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
         main_span.set_attribute("invoke_count", Counter.increment_count())
         main_span.set_attribute("input", input)
         logger.info(f'[mutate fn] invoke count: {str(Counter.get_count())}')
-        # Load abilities from JSON file
-        with open('abilities.json', 'r') as f:
-            abilities = json.load(f)
-        logger.debug(f'[mutate fn] Abilities: {abilities}')
 
         # Parse the JSON string into a Python list of dictionaries
         with tracer.start_as_current_span('parse_input'):
