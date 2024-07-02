@@ -28,7 +28,9 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input: A JSON string that represents a dictionary with a trajectory set 'data' and 'meta' keys.
     output: calls the magic selector function with a collection mutated trajectories (candidates)
     """
-    with tracer.start_span('parse_input', attributes={"invoke_count": Counter.increment_count()}):
+    with tracer.start_as_current_span('fn') as main_span:
+        main_span.set_attribute("invoke_count", Counter.increment_count())
+        main_span.set_attribute("input", input)
         logger.info(f'[mutate fn] invoke count: {str(Counter.get_count())}')
         # Load abilities from JSON file
         with open('abilities.json', 'r') as f:
@@ -36,35 +38,46 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
         logger.debug(f'[mutate fn] Abilities: {abilities}')
 
         # Parse the JSON string into a Python list of dictionaries
-        parsed_input = json.loads(input)
-        logger.debug(f'[mutate fn] Parsed input: {parsed_input}')
+        with tracer.start_as_current_span('parse_input'):
+            parsed_input = json.loads(input)
+            logger.debug(f'[mutate fn] Parsed input: {parsed_input}')
 
-        data = parsed_input.get('data', [])
-        meta = parsed_input.get('meta', {})
+            data = parsed_input.get('data', [])
+            meta = parsed_input.get('meta', {})
 
-    # (check &) increment the number of mutations
-    with tracer.start_span('mutate_count_process', attributes={"invoke_count": Counter.get_count(), "origin": meta.get('origin'), "mutations": meta.get('mutations')}):
-        if 'mutations' in meta and meta['origin'] == 'system':  # previously mutated
-            logger.info(f"[mutate fn] the trajectory was mutated {meta['mutations']} time(s).")
-            meta['mutations'] += 1
-        elif 'mutations' not in meta and meta['origin'] == 'self_report':  # first time being mutated
-            logger.info("[mutate fn] first time mutating the trajectory.")
-            meta['mutations'] = 1
-        else:
-            msg = f"[mutate fn] fatal! unexpected origin or mutations value. origin: {meta['origin']}"
-            logger.fatal(msg)
-            return msg  # guard clause
+        # (check &) increment the number of mutations
+        with tracer.start_as_current_span('process_mutate_count', attributes={"origin": meta.get('origin'),
+                                                                              "mutations": meta.get('mutations')}) as process_mutate_count_span:
+            if 'mutations' in meta and meta['origin'] == 'system':  # previously mutated
+                logger.info(f"[mutate fn] the trajectory was mutated {meta['mutations']} time(s).")
+                meta['mutations'] += 1
+            elif 'mutations' not in meta and meta['origin'] == 'self_report':  # first time being mutated
+                logger.info("[mutate fn] first time mutating the trajectory.")
+                meta['mutations'] = 1
+            else:
+                msg = f"[mutate fn] fatal! unexpected origin or mutations value. origin: {meta['origin']}"
+                process_mutate_count_span.set_attribute("error", True)
+                logger.fatal(msg)
+                return msg  # guard clause
 
-    # collection of mutate trajectories (candidates)
-    with tracer.start_span('generate_mutations', attributes={"invoke_count": Counter.get_count()}):
-        mutated_trajectories = generate_mutations(data, abilities)  # TODO: limit the mutated values' decimal precision
-        # logger.debug(f'[mutate fn] Mutated trajectories: {mutated_trajectories}')
+        # collection of mutate trajectories (candidates)
+        with tracer.start_as_current_span('generate_mutations'):
+            mutated_trajectories = generate_mutations(data,
+                                                      abilities)  # TODO: limit the mutated values' decimal precision
+            # logger.debug(f'[mutate fn] Mutated trajectories: {mutated_trajectories}')
 
-    # call next function with the selected
-    with tracer.start_span('post_magic_selector', attributes={"invoke_count": Counter.get_count()}):
-        post_magic_selector(mutated_trajectories, meta)
+        # call next function with the selected
+        with tracer.start_as_current_span('post_magic_selector') as post_magic_selector_span:
+            try:
+                r = post_magic_selector(mutated_trajectories, meta)
+                post_magic_selector_span.set_attribute("response_code", r.status_code)
+            except Exception as e:
+                logger.error(f'[mutate fn] Error in post_magic_selector: {e}')
+                post_magic_selector_span.set_attribute("error", True)
+                post_magic_selector_span.set_attribute("error_details", e)
 
-    return str({"data": mutated_trajectories})
+
+        return str({"data": mutated_trajectories})
 
 
 class Counter:

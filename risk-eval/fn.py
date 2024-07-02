@@ -27,26 +27,36 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input: A JSON string that represents a dictionary with trajectory set 'data' and 'meta' keys.
     output: calls the threshold function with the risk evaluation result
     """
-    with tracer.start_span('parse_input', attributes={"invoke_count": Counter.increment_count()}):
+    with tracer.start_as_current_span('fn') as main_span:
+        main_span.set_attribute("invoke_count", Counter.increment_count())
+        main_span.set_attribute("input", input)
         logger.info(f'[risk-eval fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
-        parsed_input = json.loads(input)
-        logger.debug(f'[risk-eval fn] Parsed input: {parsed_input}')
+        with tracer.start_as_current_span('parse_input'):
+            parsed_input = json.loads(input)
+            logger.debug(f'[risk-eval fn] Parsed input: {parsed_input}')
 
-        data = parsed_input.get('data', [])
-        meta = parsed_input.get('meta', {})
+            data = parsed_input.get('data', [])
+            meta = parsed_input.get('meta', {})
 
-    # Call the sample function with the parsed input
-    with tracer.start_span('detect_collisions', attributes={"invoke_count": Counter.get_count()}):
-        # TODO: get parameters from ENV
-        result = detect_collisions(data, time_interval=1, num_steps=10, horizontal_separation=5, vertical_separation=300)
-        logger.info(f'[risk-eval fn] Result of collision detection: {result}')
+        # Call the sample function with the parsed input
+        with tracer.start_as_current_span('detect_collisions'):
+            # TODO: get parameters from ENV
+            result = detect_collisions(data, time_interval=1, num_steps=10, horizontal_separation=5,
+                                       vertical_separation=300)
+            logger.info(f'[risk-eval fn] Result of collision detection: {result}')
 
-    # calls to :8000/threshold
-    with tracer.start_span('post_threshold', attributes={"invoke_count": Counter.get_count()}):
-        post_threshold(data, meta, result)
+        # calls to :8000/threshold
+        with tracer.start_as_current_span('post_threshold') as post_threshold_span:
+            try:
+                r = post_threshold(data, meta, result)
+                post_threshold_span.set_attribute("response_code", r.status_code)
+            except Exception as e:
+                logger.error(f'[risk-eval fn] Error in post_threshold: {e}')
+                post_threshold_span.set_attribute("error", True)
+                post_threshold_span.set_attribute("error_details", e)
 
-    return str(result)  # for debugging purposes
+        return str(result)  # for debugging purposes
 
 
 class Counter:

@@ -26,12 +26,12 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input: A JSON string that represents a dictionary with trajectory set candidates 'data' and 'meta' keys.
     output: calls the risk evaluation function with the selected trajectory
     """
-    with tracer.start_span('fn') as main_span:
+    with tracer.start_as_current_span('fn') as main_span:
         main_span.set_attribute("invoke_count", Counter.increment_count())
-        # main_span.set_attribute("input", input)
+        main_span.set_attribute("input", input)
         logger.info(f'[magicselector fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
-        with tracer.start_span('parse_input'):
+        with tracer.start_as_current_span('parse_input'):
             parsed_input = json.loads(input)
             logger.debug(f'[magicselector fn] Parsed input: {parsed_input}')
 
@@ -39,7 +39,7 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
             meta = parsed_input.get('meta', {})
 
         # select one of the candidate trajectories
-        with tracer.start_span('select_trajectory'):
+        with tracer.start_as_current_span('select_trajectory'):
             new_data = data[0]  # TODO: implement a selection algorithm
             main_span.set_attribute("chosen_trajectory", new_data)
             logger.info(f'[magicselector fn] chosen trajectory set: {new_data}')
@@ -48,16 +48,16 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
             meta['origin'] = "system"
 
         # call risk evaluation function
-        with tracer.start_span('post_risk_eval',) as post_risk_eval_span:
+        with tracer.start_as_current_span('post_risk_eval') as post_risk_eval_span:
             try:
                 r = post_risk_eval(new_data, meta)
                 post_risk_eval_span.set_attribute("response_code", r.status_code)
             except Exception as e:
                 logger.error(f'[magicselector fn] Error in post_risk_eval: {e}')
                 post_risk_eval_span.set_attribute("error", True)
+                post_risk_eval_span.set_attribute("error_details", e)
 
         return f"new trajectory: {new_data}"
-
 
 class Counter:
     count = None

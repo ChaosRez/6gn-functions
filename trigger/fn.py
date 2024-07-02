@@ -29,52 +29,77 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input: gets a new trajectory. Invoked by the update function
     output: calls the risk-eval function with the recent trajectories from the db
     """
-    with tracer.start_span('parse_input', attributes={"invoke_count": Counter.increment_count()}):
+    with tracer.start_as_current_span('fn') as main_span:
+        main_span.set_attribute("invoke_count", Counter.increment_count())
+        main_span.set_attribute("input", input)
         logger.info(f'[trigger fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
-        parsed_input = json.loads(input)
-        logger.debug(f'[trigger fn] Parsed input: {parsed_input}')
+        with tracer.start_as_current_span('parse_input'):
+            parsed_input = json.loads(input)
+            logger.debug(f'[trigger fn] Parsed input: {parsed_input}')
 
-        # data = parsed_input.get('data', [])  # no data expected
-        meta = parsed_input.get('meta', {})
+            # data = parsed_input.get('data', []) # no data expected
+            meta = parsed_input.get('meta', {})
 
-    # Check the 'origin' in 'meta'
-    origin = meta.get('origin', None)
-    if origin is None:
-        logger.error(f'[trigger fn] No origin key found in meta. dump: {meta}')
-        return f'No origin key found in meta. dump: {meta}'
+        # Check the 'origin' in 'meta'
+        origin = meta.get('origin', None)
+        if origin is None:
+            logger.error(f'[trigger fn] No origin key found in meta. dump: {meta}')
+            main_span.set_attribute("error", True)
+            main_span.set_attribute("error_details", "No origin key found in meta")
+            return f'No origin key found in meta. dump: {meta}'
 
-    # Check if 'origin' is 'self_report'
-    if origin != 'self_report':
-        logger.error(f'[trigger fn] Origin is not self_report. dump: {meta}')
-        return f'Origin is not self_report. dump: {meta}'
+        # Check if 'origin' is 'self_report'
+        if origin != 'self_report':
+            logger.error(f'[trigger fn] Origin is not self_report. dump: {meta}')
+            main_span.set_attribute("error", True)
+            main_span.set_attribute("error_details", "Origin is not self_report")
+            return f'Origin is not self_report. dump: {meta}'
 
-    # Generate a unique request_id and add it to the meta dictionary
-    with tracer.start_span('gen_req_uid', attributes={"invoke_count": Counter.get_count()}):
-        request_id = str(uuid.uuid4())
-        meta['request_id'] = request_id
-        logger.info(f'[trigger fn] Generated request_id: {request_id}')
+        # Generate a unique request_id and add it to the meta dictionary
+        with tracer.start_as_current_span('gen_req_uid') as gen_req_uid_span:
+            request_id = str(uuid.uuid4())
+            meta['request_id'] = request_id
+            logger.info(f'[trigger fn] Generated request_id: {request_id}')
+            gen_req_uid_span.set_attribute("request_id", request_id)
 
-    # TODO: get the ttl from ENV
-    # TODO: if db is slow, call it in parallel with previous code
-    # Get recent trajectory from each uav (limited by ttl, in seconds)
-    # includes the trajectory from the update (already in db)
-    ttl = 100  # seconds
-    with tracer.start_span('get_recent_trajectories', attributes={"invoke_count": Counter.get_count(), "ttl": ttl}):
-        recent_trajectories = get_recent_trajectories(ttl)
+        # TODO: get the ttl from ENV
+        # TODO: if db is slow, call it in parallel with previous code
+        # Get recent trajectory from each uav (limited by ttl, in seconds)
+        # includes the trajectory from the update (already in db)
+        ttl = 100  # seconds
+        with tracer.start_as_current_span('get_recent_trajectories', attributes={"ttl": ttl}) as get_recent_trajectories_span:
+            try:
+                recent_trajectories = get_recent_trajectories(ttl)
+            except Exception as e:
+                logger.error(f'[trigger fn] Error in get_recent_trajectories: {e}')
+                get_recent_trajectories_span.set_attribute("error", True)
+                get_recent_trajectories_span.set_attribute("error_details", e)
+                return f'Error in get_recent_trajectories: {e}'
 
-    # Check if recent_trajectories is not empty, else call risk-eval function
-    with tracer.start_span('post_risk_eval_if_any_traj', attributes={"invoke_count": Counter.get_count(), "recent_trajectories_size": len(recent_trajectories)}):
-        if not recent_trajectories:
-            logger.error(f'[trigger fn] No recent trajectories found')
-            return f'No recent trajectories found'
-        else:
-            logger.info(
-                f'[trigger fn] Found {len(recent_trajectories)} trajectories for uav_ids: {[trajectory["uav_id"] for trajectory in recent_trajectories]}')
-            # call risk-eval function
-            encoded_recent_trajectories = [JSONEncoder().default(trajectory) for trajectory in recent_trajectories]
-            post_risk_eval(encoded_recent_trajectories, meta)
-            return str(encoded_recent_trajectories)
+        # Check if recent_trajectories is not empty, else call risk-eval function
+        with tracer.start_as_current_span('post_risk_eval_if_any_traj') as post_risk_eval_if_any_traj_span:
+            post_risk_eval_if_any_traj_span.set_attribute("recent_trajectories_size", len(recent_trajectories))
+            if not recent_trajectories:
+                logger.error(f'[trigger fn] No recent trajectories found')
+                post_risk_eval_if_any_traj_span.set_attribute("error", True)
+                post_risk_eval_if_any_traj_span.set_attribute("error_details", "No recent trajectories found")
+                return f'No recent trajectories found'
+            else:
+                logger.info(
+                    f'[trigger fn] Found {len(recent_trajectories)} trajectories for uav_ids: {[trajectory["uav_id"] for trajectory in recent_trajectories]}')
+                # call risk-eval function
+                with tracer.start_as_current_span('post_risk_eval') as post_risk_eval_span:
+                    with tracer.start_as_current_span('json_encode_recent_trajectories'):
+                        encoded_recent_trajectories = [JSONEncoder().default(trajectory) for trajectory in recent_trajectories]
+                    try:
+                        r = post_risk_eval(encoded_recent_trajectories, meta)
+                        post_risk_eval_span.set_attribute("response_code", r.status_code)
+                    except Exception as e:
+                        logger.error(f'[trigger fn] Error in post_risk_eval: {e}')
+                        post_risk_eval_span.set_attribute("error", True)
+                        post_risk_eval_span.set_attribute("error_details", e)
+                    return str(encoded_recent_trajectories)
 
 
 class Counter:

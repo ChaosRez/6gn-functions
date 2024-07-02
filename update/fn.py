@@ -28,38 +28,61 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input: A JSON string of collection of new trajectories
     output: writes to the db, and may call trigger function
     """
-    with tracer.start_span('parse_input', attributes={"invoke_count": Counter.increment_count()}):
+    with tracer.start_as_current_span('fn') as main_span:
+        main_span.set_attribute("invoke_count", Counter.increment_count())
+        main_span.set_attribute("input", input)
         logger.info(f'[update fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
-        parsed_input = json.loads(input)
-        logger.debug(f'[update fn] Parsed input: {parsed_input}')
+        with tracer.start_as_current_span('parse_input'):
+            parsed_input = json.loads(input)
+            logger.debug(f'[update fn] Parsed input: {parsed_input}')
 
-        data = parsed_input.get('data', [])
-        meta = parsed_input.get('meta', {})
+            data = parsed_input.get('data', [])
+            meta = parsed_input.get('meta', {})
 
-    # Check the 'origin' in 'meta'
-    origin = meta.get('origin', None)
-    if origin is None:
-        logger.error(f'[update fn] No origin key found in meta')
-        return f'No origin key found in meta. dump: {meta}'
+        # Check the 'origin' in 'meta'
+        origin = meta.get('origin', None)
+        if origin is None:
+            logger.error(f'[update fn] No origin key found in meta')
+            main_span.set_attribute("error", True)
+            main_span.set_attribute("error_details", f'No origin key found in meta. dump: {meta}')
+            return f'No origin key found in meta. dump: {meta}'
 
-    # store the data and call the trigger function
-    with tracer.start_span('post_trigger_n_store_updates', attributes={"invoke_count": Counter.get_count(), "origin": origin}):
-        if origin == 'system':  # invoked by release()
-            logger.info(f'[update fn] storing the released data. dump: {data}')
-            store_update(data)  # NOTE: multiple trajectories can be released by the system
-            logger.info(f'[update fn] will NOT call post_trigger() as it is from system')
-        elif origin == 'self_report':  # invoked by ingest
-            logger.info('[update fn] storing the reported data.')
-            store_update(data)  # NOTE: usually only one trajectory is reported
-            logger.info('[update fn] Calling post_trigger with data and meta')
-            # json_serialiized_data = JSONEncoder().encode(data)  # after adding created_at as python timestamp
-            post_trigger("", meta)
-        else:
-            logger.fatal(f'[update fn] Unknown origin: {origin}')
-            return f'Unknown origin: {origin}'
+        # store the data and call the trigger function
+        with tracer.start_as_current_span('store_n_decide_to_trigger') as store_n_decide_span:
+            store_n_decide_span.set_attribute("origin", origin)
+            if origin == 'system':  # invoked by release()
+                logger.info(f'[update fn] will NOT call post_trigger() as it is from system. storing the released data. dump: {data}')
+                try:
+                    store_update(data)  # NOTE: multiple trajectories can be released by the system
+                except Exception as e:
+                    logger.error(f'[update fn] Error in store_update: {e}')
+                    store_n_decide_span.set_attribute("error", True)
+                    store_n_decide_span.set_attribute("error_details", e)
+            elif origin == 'self_report':  # invoked by ingest
+                logger.info('[update fn] storing the reported data.')
+                try:
+                    store_update(data)  # NOTE: usually only one trajectory is reported
+                except Exception as e:
+                    logger.error(f'[update fn] Error in store_update: {e}')
+                    store_n_decide_span.set_attribute("error", True)
+                    store_n_decide_span.set_attribute("error_details", e)
+                logger.info('[update fn] Calling post_trigger with data and meta')
+                with tracer.start_as_current_span('post_trigger') as post_trigger_span:
+                    # json_serialiized_data = JSONEncoder().encode(data)  # after adding created_at as python timestamp
+                    try:
+                        post_trigger("", meta)
+                    except Exception as e:
+                        logger.error(f'[update fn] Error in post_trigger: {e}')
+                        post_trigger_span.set_attribute("error", True)
+                        post_trigger_span.set_attribute("error_details", e)
+            else:
+                logger.fatal(f'[update fn] Unknown origin: {origin}')
+                store_n_decide_span.set_attribute("error", True)
+                store_n_decide_span.set_attribute("error_details", f'Unknown origin: {origin}')
+                return f'Unknown origin: {origin}'
 
-    return str(data)
+        return str(data)
 
 
 class Counter:
