@@ -26,22 +26,31 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     input:
     output:
     """
-    with tracer.start_span('parse_input', attributes={"invoke_count": Counter.increment_count()}):
+    with tracer.start_as_current_span('fn') as main_span:
+        main_span.set_attribute("invoke_count", Counter.increment_count())
+        main_span.set_attribute("input", input)
         logger.info(f'[??? fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
-        parsed_input = json.loads(input)
-        logger.debug(f'[??? fn] Parsed input: {parsed_input}')
+        with tracer.start_as_current_span('parse_input'):
+            parsed_input = json.loads(input)
+            logger.debug(f'[??? fn] Parsed input: {parsed_input}')
 
-        data = parsed_input.get('data', [])
-        meta = parsed_input.get('meta', {})
+            data = parsed_input.get('data', [])
+            meta = parsed_input.get('meta', {})
 
-    ###  with tracer.start_span('', attributes={"invoke_count": Counter.get_count()}):
+        ###  with tracer.start_as_current_span(''):
 
-    # call ??? function
-    with tracer.start_span('post_', attributes={"invoke_count": Counter.get_count()}):
-        post_(data, meta)
+        # call ??? function
+        with tracer.start_as_current_span('post_') as post__span:
+            try:
+                r = post_(data, meta)
+                post__span.set_attribute("response_code", r.status_code)
+            except Exception as e:
+                logger.error(f'[??? fn] Error in post_: {e}')
+                post__span.set_attribute("error", True)
+                post__span.set_attribute("error_details", e)
 
-    return str("???")
+        return str("???")
 
 
 class Counter:
