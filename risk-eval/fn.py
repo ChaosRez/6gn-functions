@@ -22,6 +22,10 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("risk-eval").tracer
 
+TIME_INTERVAL = 1; NUM_STEPS = 10; HORIZONTAL_SEPARATION = 5;
+VERTICAL_SEPARATION = 300
+
+
 def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with trajectory set 'data' and 'meta' keys.
@@ -42,8 +46,8 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
         # Call the sample function with the parsed input
         with tracer.start_as_current_span('detect_collisions'):
             # TODO: get parameters from ENV
-            result = detect_collisions(data, time_interval=1, num_steps=10, horizontal_separation=5,
-                                       vertical_separation=300)
+            result = detect_collisions(data, TIME_INTERVAL, NUM_STEPS, HORIZONTAL_SEPARATION,
+                                       VERTICAL_SEPARATION)
             logger.info(f'[risk-eval fn] Result of collision detection: {result}')
 
         # calls to :8000/threshold

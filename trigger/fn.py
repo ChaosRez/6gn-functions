@@ -24,6 +24,8 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("trigger").tracer
 
+TTL = 100  # seconds
+
 def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     """
     input: gets a new trajectory. Invoked by the update function
@@ -67,10 +69,9 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
         # TODO: if db is slow, call it in parallel with previous code
         # Get recent trajectory from each uav (limited by ttl, in seconds)
         # includes the trajectory from the update (already in db)
-        ttl = 100  # seconds
-        with tracer.start_as_current_span('get_recent_trajectories', attributes={"ttl": ttl}) as get_recent_trajectories_span:
+        with tracer.start_as_current_span('get_recent_trajectories', attributes={"ttl": TTL}) as get_recent_trajectories_span:
             try:
-                recent_trajectories = get_recent_trajectories(ttl)
+                recent_trajectories = get_recent_trajectories(TTL)
             except Exception as e:
                 logger.error(f'[trigger fn] Error in get_recent_trajectories: {e}')
                 get_recent_trajectories_span.set_attribute("error", True)

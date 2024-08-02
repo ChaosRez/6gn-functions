@@ -69,7 +69,7 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
             p.flush()  # blocking
             logger.info(f'[release fn] publish confirmation. meta dump: {meta}')
 
-        return str("release func")
+        return str("release func. check logs for details")
 
 
 def delivery_report(err, msg):
