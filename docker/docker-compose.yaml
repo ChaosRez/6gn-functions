@@ -22,6 +22,15 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  ingester:
+    build:
+      context: ingester/ # Path to the directory containing the project and Dockerfile
+      dockerfile: Dockerfile
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+
   mongo:
     image: mongo:3.6.23
     container_name: mongodb-3.6.23
@@ -48,8 +57,6 @@ services:
     environment:
       - COLLECTOR_ZIPKIN_HTTP_PORT=9411
       - COLLECTOR_OTLP_ENABLED=true  # Enable OTLP on the collector
-#      - COLLECTOR_OTLP_GRPC_PORT=14250
-#      - COLLECTOR_OTLP_HTTP_PORT=55681
 
 volumes:
   mongodb-data:
