@@ -18,11 +18,13 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-ENV LIBRD_VER=2.4.0
+ #2.4.0 was used last time
+ENV LIBRD_VER=2.5.0
 
 # https://gist.github.com/jaihind213/e82d41dc79f52cfa64ca32350bdb27df
 RUN apk add --no-cache --virtual .make-deps wget git  && apk add --no-cache musl-dev zlib-dev openssl zstd-dev pkgconfig libc-dev
-RUN wget https://github.com/edenhill/librdkafka/archive/v${LIBRD_VER}.tar.gz
+#RUN wget https://github.com/edenhill/librdkafka/archive/v${LIBRD_VER}.tar.gz
+RUN wget https://github.com/confluentinc/librdkafka/archive/v${LIBRD_VER}.tar.gz
 RUN tar -xvf v${LIBRD_VER}.tar.gz && cd librdkafka-${LIBRD_VER} && ./configure --prefix /usr && make && make install
 
 # Download, extract, build, and install librdkafka from source (OBSELETE, librdkafka > 2.4.0 is needed)
