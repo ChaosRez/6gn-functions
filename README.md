@@ -11,11 +11,59 @@ find specific trajectories that are generated. This key is added by "mutate" fun
 
 ### Notes
 - function container in tinyfaas doesn't have build tools for some python libraries, so we need to build the wheel in a separate environment.
-- Note tracing has sampling.always_on, so it will be costly
-- Compass rose is used as reference for directions:
+- Note tracing has sampling.always_on, so it will be costly. You may change it in production.
+- Compass rose is used as reference for directions (0 degree is north):
 ![Compass Rose](Compass-rose-32-pt.svg)
+
+## Install on a Server
+add docker repo
+```bash
+# Add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+```
+
+install recent docker and other required packages
+```bash
+sudo apt update && sudo apt install -y neovim tmux bat htop libavutil-dev git-core make zip docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+You may need to `sudo groupadd docker` and `sudo usermod -aG docker ${USER}` and restart
+```bash
+wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz #for amd based (cloud)
+rm go1.22.5.linux-amd64.tar.gz
+```
+Then add these lines to `~.profile` and  run `source ~/.profile` to apply changes:
+```bash
+PATH=$PATH:/usr/local/go/bin  
+GOPATH=$HOME/go
+alias bat="batcat"
+```
+get tinyfaas
+```bash
+git clone https://github.com/OpenFogStack/tinyFaaS.git
+```
+Then you should modify tinyfaas to support build tools.
+
+run kafka and jaeger. Note that Kafka advertised address should be the public IP of the server
+```bash
+mkdir 6gn && cd 6gn
+nvim docker-compose.yml
+```
 
 ## Copyright Notice
 For any usage, modifications, or distribution, please contact the project maintainer and repository owner at malekabbasi@tu-berlin.de. All rights reserved.
 
 This notice must be included in any copy, modification, or distribution of the project's files.
+
+
