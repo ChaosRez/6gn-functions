@@ -27,12 +27,13 @@ with open('abilities.json', 'r') as f:
     abilities = json.load(f)
 logger.debug(f'[mutate fn] Abilities: {abilities}')
 
+MAX_MUTATIONS = 100  # TODO: get from ENV
 
 # FIXME: the output's 'direction' and 'speed' values can be long floats. make them int afterward?
 def fn(input: typing.Optional[str]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with a trajectory set 'data' and 'meta' keys.
-    output: calls the magic selector function with a collection mutated trajectories (candidates)
+    output: calls the magic selector function with a collection of mutated trajectories set (candidates)
     """
     with tracer.start_as_current_span('fn') as main_span:
         main_span.set_attribute("invoke_count", Counter.increment_count())
@@ -52,6 +53,9 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
                                                                               "mutations": meta.get('mutations')}) as process_mutate_count_span:
             if 'mutations' in meta and meta['origin'] == 'system':  # previously mutated
                 logger.info(f"[mutate fn] the trajectory was mutated {meta['mutations']} time(s).")
+                if meta['mutations'] > MAX_MUTATIONS:
+                    logger.warning(f"[mutate fn] the trajectory has been mutated more than {MAX_MUTATIONS} times. Aborting the request.")
+                    return f"Trajectory mutated more than {MAX_MUTATIONS} times. Aborting."
                 meta['mutations'] += 1
             elif 'mutations' not in meta and meta['origin'] == 'self_report':  # first time being mutated
                 logger.info("[mutate fn] first time mutating the trajectory.")
