@@ -55,10 +55,13 @@ git clone https://github.com/OpenFogStack/tinyFaaS.git
 ```
 Then you should modify tinyfaas to support build tools.
 
-run kafka and jaeger. Note that Kafka advertised address should be the public IP of the server
+run kafka, jaeger, mongodb, and Ingester vias `docker compose`.
+Note that Kafka advertised address should be the public IP of the server.
+Also, the 'ingester' service should be modified to use the public IP of Kafka.
 ```bash
 mkdir 6gn && cd 6gn
 nvim docker-compose.yml
+docker compose  up -d --build
 ```
 
 ## Copyright Notice
