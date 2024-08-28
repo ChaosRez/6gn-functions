@@ -1,10 +1,8 @@
-### meta:
-```json
+# 6gNext functions
 
-```
-
-### data:
-find specific trajectories that are generated. This key is added by "mutate" func
+### data format:
+For a sample data format, check data.json file.   
+To find specific trajectories that are generated and not reported by UAVs, This key is added by "mutate" function.
 ```json
 {"origin":  "mutate"}
 ```
