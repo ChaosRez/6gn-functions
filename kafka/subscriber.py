@@ -2,13 +2,14 @@ from confluent_kafka import Consumer, KafkaException
 from confluent_kafka.admin import AdminClient, NewTopic
 from datetime import datetime
 
+HOST = "localhost"
 def create_topic(topic_name):
-    admin_client = AdminClient({'bootstrap.servers': 'localhost:9092'})   #NOTE: hardcoded credentials
+    admin_client = AdminClient({'bootstrap.servers': f'{HOST}:9092'})   #NOTE: hardcoded credentials
     topic = NewTopic(topic_name, num_partitions=1, replication_factor=1)
     admin_client.create_topics([topic])
 
 def create_consumer():
-    conf = {'bootstrap.servers': "localhost:9092", 'group.id': "group1", 'auto.offset.reset': 'earliest'}
+    conf = {'bootstrap.servers': f"{HOST}:9092", 'group.id': "group1", 'auto.offset.reset': 'earliest'}
     consumer = Consumer(conf)
     return consumer
 
