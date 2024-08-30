@@ -3,7 +3,7 @@
 import json
 import typing
 import logging
-from confluent_kafka import Producer
+import paho.mqtt.client as mqtt
 
 from call_next_func import post_update
 from timestamp_for_logger import CustomFormatter
@@ -22,9 +22,18 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("release").tracer
 
-# Set up Kafka producer
-host = "172.17.0.1"  #TODO: import from ENV
-p = Producer({'bootstrap.servers': f'{host}:9092'})
+# Set up MQTT client
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("Connected to MQTT Broker!")
+    else:
+        print("Failed to connect, return code %d\n", rc)
+host = "172.17.0.1"  # TODO: import from ENV
+port = 1883
+client = mqtt.Client()
+client.on_connect = on_connect
+client.connect(host, port, 60)
+
 
 
 def fn(input: typing.Optional[str]) -> typing.Optional[str]:
@@ -51,7 +60,7 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
 
         # Publish the trajectories to the 'release' topic
         with tracer.start_as_current_span('publish_w_delivery_report'):
-            p.produce('releases', json.dumps(mutated_data), callback=delivery_report)
+            client.publish('releases', json.dumps(mutated_data), qos=1)  # At least once delivery
             logger.info(f'[release fn] Published mutated_data to releases topic: {mutated_data}')
 
         # call update function
@@ -64,21 +73,7 @@ def fn(input: typing.Optional[str]) -> typing.Optional[str]:
                 post_update_span.set_attribute("error", True)
                 post_update_span.set_attribute("error_details", e)
 
-        # Wait for any outstanding messages to be delivered and delivery reports to be received.
-        with tracer.start_as_current_span('flush'):  # TODO: can be async or in parallel somehow
-            p.flush()  # blocking
-            logger.info(f'[release fn] publish confirmation. meta dump: {meta}')
-
         return str("release func. check logs for details")
-
-
-def delivery_report(err, msg):
-    """ Called once for each message produced to indicate delivery result.
-        Triggered by poll() or flush(). """
-    if err is not None:
-        logger.error(f'Message delivery failed: {err}\n dumping message: {msg.value()}')
-    else:
-        logger.info(f'Message delivered to {msg.topic()} [{msg.partition()}]')
 
 
 class Counter:

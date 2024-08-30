@@ -62,6 +62,18 @@ nvim docker-compose.yml
 docker compose  up -d --build
 ```
 
+## MQTT QoS
+The UAV clients should use a QoS level of 0 for sending updates. But the Release function should use QoS level 1. The release message should be sent with a unique identifier to prevent the UAVs from executing the release command multiple times.
+
+`qos=0`: At most once delivery (default). The message is sent once with no guarantee of delivery.
+`qos=1`: At least once delivery. The broker acknowledges receipt of the message. If the acknowledgment is not received within a timeout, the client will resend the message.
+`qos=2`: Exactly once delivery. This ensures that the message is delivered exactly once to the subscribers. It involves a more complex handshaking process between the client and the broker.
+
+## Secutiry and Performance Considerations
+- Mongodb and Mosquitto are not secure by default. You should add authentication and authorization.
+- tinyFaaS functions supposed not to be available from internet. They are not supposed to be called by anyone but the ingester.
+- functions and ingester will send all trace samples to jaeger by default. You may want to change the sampling rate or disable it.
+
 ## Copyright Notice
 For any usage, modifications, or distribution, please contact the project maintainer and repository owner at malekabbasi@tu-berlin.de. All rights reserved.
 
