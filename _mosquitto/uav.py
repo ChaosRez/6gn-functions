@@ -4,11 +4,12 @@ from datetime import datetime
 HOST = "localhost"
 PORT = 1883
 TOPIC = "releases"
+QoS = 1  # at least once
 
 def on_connect(client, userdata, flags, rc, properties=None):
     print(f"Connected with result code {rc}")
     if rc == 0:
-        client.subscribe(TOPIC)
+        client.subscribe(TOPIC, qos=QoS)
     else:
         print(f"Failed to connect, return code {rc}")
 
@@ -23,7 +24,7 @@ def on_message(client, userdata, msg):
     print(f'[{timestamp}] Received message: {msg.payload.decode("utf-8")}')
 
 def create_mqtt_client():
-    client = mqtt.Client(protocol=mqtt.MQTTv5)
+    client = mqtt.Client() # protocol=mqtt.MQTTv5)
     client.on_connect = on_connect
     client.on_subscribe = on_subscribe
     client.on_message = on_message

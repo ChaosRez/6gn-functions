@@ -28,11 +28,14 @@ def on_connect(client, userdata, flags, rc):
         print("Connected to MQTT Broker!")
     else:
         print("Failed to connect, return code %d\n", rc)
-host = "172.17.0.1"  # TODO: import from ENV
+
+host = "172.17.0.1"   # TODO: import from ENV
 port = 1883
+qos = 1  # At least once delivery
 client = mqtt.Client()
 client.on_connect = on_connect
 client.connect(host, port, 60)
+client.loop_start()  # Start the loop in a separate thread. it was needed on raspberry to publishes work
 
 
 
@@ -59,9 +62,13 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
             logger.debug(f'[release fn] Mutated data to release: {mutated_data}')
 
         # Publish the trajectories to the 'release' topic
-        with tracer.start_as_current_span('publish_w_delivery_report'):
-            client.publish('releases', json.dumps(mutated_data), qos=1)  # At least once delivery
-            logger.info(f'[release fn] Published mutated_data to releases topic: {mutated_data}')
+        with tracer.start_as_current_span('publish_release') as pub_span:
+            pub_span.set_attribute("QoS", qos)
+            result, mid = client.publish('releases', json.dumps(mutated_data), qos=qos)
+            if result == mqtt.MQTT_ERR_SUCCESS:
+                logger.info(f'[release fn] Published mutated_data to releases topic: {mutated_data}')
+            else:
+                logger.error(f'[release fn] Failed to publish to releases topic, result code: {result}')
 
         # call update function
         with tracer.start_as_current_span('post_update') as post_update_span:
