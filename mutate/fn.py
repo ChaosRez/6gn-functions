@@ -30,7 +30,7 @@ logger.debug(f'[mutate fn] Abilities: {abilities}')
 MAX_MUTATIONS = 100  # TODO: get from ENV
 
 # FIXME: the output's 'direction' and 'speed' values can be long floats. make them int afterward?
-def fn(input: typing.Optional[str]) -> typing.Optional[str]:
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with a trajectory set 'data' and 'meta' keys.
     output: calls the magic selector function with a collection of mutated trajectories set (candidates)

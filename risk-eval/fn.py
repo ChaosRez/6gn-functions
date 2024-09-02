@@ -26,7 +26,7 @@ TIME_INTERVAL = 1; NUM_STEPS = 10; HORIZONTAL_SEPARATION = 5;
 VERTICAL_SEPARATION = 300
 
 
-def fn(input: typing.Optional[str]) -> typing.Optional[str]:
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with trajectory set 'data' and 'meta' keys.
     output: calls the threshold function with the risk evaluation result

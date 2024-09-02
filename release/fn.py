@@ -36,7 +36,7 @@ client.connect(host, port, 60)
 
 
 
-def fn(input: typing.Optional[str]) -> typing.Optional[str]:
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: trajectories needed to be released and update
     output: publishes the data to the '/release' topic, and calls the update function

@@ -23,7 +23,7 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("update").tracer
 
-def fn(input: typing.Optional[str]) -> typing.Optional[str]: # NOTE: should not be parallelized with postTrigger, as it will read the write update() does
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]: # NOTE: should not be parallelized with postTrigger, as it will read the write update() does
     """
     input: A JSON string of collection of new trajectories
     output: writes to the db, and may call trigger function

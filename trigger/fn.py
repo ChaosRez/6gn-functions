@@ -26,7 +26,7 @@ tracer = TracerInitializer("trigger").tracer
 
 TTL = 100  # seconds
 
-def fn(input: typing.Optional[str]) -> typing.Optional[str]:
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: gets a new trajectory. Invoked by the update function
     output: calls the risk-eval function with the recent trajectories from the db

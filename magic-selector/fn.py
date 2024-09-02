@@ -21,7 +21,7 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("magic-selector").tracer
 
-def fn(input: typing.Optional[str]) -> typing.Optional[str]:
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with trajectory set candidates 'data' and 'meta' keys.
     output: calls the risk evaluation function with the selected trajectory

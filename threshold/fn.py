@@ -23,7 +23,7 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("threshold").tracer
 
-def fn(input: typing.Optional[str]) -> typing.Optional[str]:
+def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with trajectory set 'data' and 'meta' (incl. 'risk' value)
     keys. output: calls the mutate function if the risk is above the threshold, otherwise based on 'origin' metadata,
