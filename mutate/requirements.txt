@@ -2,4 +2,4 @@ requests
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc
-./grpcio-1.64.1-cp311-cp311-linux_aarch64.whl
+grpcio
