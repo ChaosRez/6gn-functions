@@ -4,38 +4,32 @@ import random
 logger = logging.getLogger(__name__)
 
 
-def generate_mutations(trajectories, abilities):
-    new_candidates = []
+# decreases the speed of the lower priority UAV with a collision (from two colliding UAVs)
+def dec_speed_of_lower_collider(trajectories, abilities):
+    # Filter trajectories with collision set to True
+    collision_trajectories = [t for t in trajectories if t.get('collision', False)]
 
-    # Iterate over each uav trajectories in data
-    for i, trajectory in enumerate(trajectories):
-        mutated_trajectories = trajectories.copy()  # Create a copy of the trajectories
-        uav_type = trajectory.get('uav_type', None)
-        if uav_type is None:
-            logger.error(f'[mutate fn] No uav_type key found in trajectory: {trajectory}')
-            return 'No origin key found in meta'
+    if len(collision_trajectories) <= 1:
+        logger.error(f'[mutate fn] Not enough collisions to determine lower priority UAV: {collision_trajectories}')
+        return False, f'Not enough collisions to determine lower priority UAV: {collision_trajectories}'
 
-        # Retrieve the min_speed and max_speed for the uav_type from abilities
-        uav_ability = abilities.get(uav_type, {})
+    # Find the trajectory with the highest uav_id (Lower priority)
+    lowest_uav_id_trajectory = max(collision_trajectories, key=lambda t: t['uav_id'])  #TODO proper priority check
 
-        # Generate a random speed in the range of min_speed and max_speed
-        new_speed = random.uniform(uav_ability.get('min_speed', 0), uav_ability.get('max_speed', 0))
+    # Decrease the speed by 25% (inplace)
+    original_speed = lowest_uav_id_trajectory['speed']
+    lowest_uav_id_trajectory['speed'] = original_speed * 0.75
 
-        # Generate a random bearing change that is less than max_bearing
-        bearing_change = random.uniform(-uav_ability.get('max_bearing', 0), uav_ability.get('max_bearing', 0))
+    # set flags
+    lowest_uav_id_trajectory['origin'] = 'mutate'  # flag the updated trajectory
+    lowest_uav_id_trajectory['mutation_cases'] = "001"  # binary flag for Case 1
 
-        # The trajectory with the updated speed and direction
-        new_trajectory = trajectory.copy()  # Create a copy of the trajectory
-        new_trajectory['origin'] = 'mutate'  # flag the updated trajectory
-        new_trajectory['speed'] = new_speed
-        new_trajectory['direction'] = (new_trajectory[
-                                           'direction'] + bearing_change) % 360  # Ensure the direction is within [0, 360)
+    # Remove the "collision" key from each trajectory in collision_trajectories
+    for trajectory in collision_trajectories:
+        if 'collision' in trajectory:
+            del trajectory['collision']
 
-        # Replace the current trajectory in the mutated_trajectories list with the new trajectory
-        mutated_trajectories[i] = new_trajectory
+    logger.info(
+        f'[mutate fn] Decreased speed of UAV {lowest_uav_id_trajectory["uav_id"]} from {original_speed} to {lowest_uav_id_trajectory["speed"]}')
 
-        # Add the new candidate to the list of candidates
-        new_candidates.append(mutated_trajectories)
-        logger.info(f'[mutate fn] mutated trajectory of new candidate: {new_trajectory}')
-
-    return new_candidates
+    return True, trajectories

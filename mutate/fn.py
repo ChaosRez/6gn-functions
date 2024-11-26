@@ -4,10 +4,10 @@ import json
 import typing
 import logging
 
-from call_next_func import post_magic_selector
+from call_next_func import post_collision_detector
 from timestamp_for_logger import CustomFormatter
 from tracer import TracerInitializer
-from mutate import generate_mutations
+from mutate import generate_mutations, dec_speed_of_lower_collider
 
 # Set up Python logger. milliseconds are not supported by default
 logging.basicConfig(
@@ -28,6 +28,7 @@ with open('abilities.json', 'r') as f:
 logger.debug(f'[mutate fn] Abilities: {abilities}')
 
 MAX_MUTATIONS = 100  # TODO: get from ENV
+
 
 # FIXME: the output's 'direction' and 'speed' values can be long floats. make them int afterward?
 def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
@@ -50,11 +51,12 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
 
         # (check &) increment the number of mutations
         with tracer.start_as_current_span('process_mutate_count', attributes={"origin": meta.get('origin'),
-                                                                              "mutations": meta.get('mutations')}) as process_mutate_count_span:
+                                                                              "mutations": meta.get('mutations', None)}) as process_mutate_count_span:
             if 'mutations' in meta and meta['origin'] == 'system':  # previously mutated
                 logger.info(f"[mutate fn] the trajectory was mutated {meta['mutations']} time(s).")
                 if meta['mutations'] > MAX_MUTATIONS:
-                    logger.warning(f"[mutate fn] the trajectory has been mutated more than {MAX_MUTATIONS} times. Aborting the request.")
+                    logger.warning(
+                        f"[mutate fn] the trajectory has been mutated more than {MAX_MUTATIONS} times. Aborting the request.")
                     return f"Trajectory mutated more than {MAX_MUTATIONS} times. Aborting."
                 meta['mutations'] += 1
             elif 'mutations' not in meta and meta['origin'] == 'self_report':  # first time being mutated
@@ -67,23 +69,28 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
                 return msg  # guard clause
 
         # collection of mutate trajectories (candidates)
-        with tracer.start_as_current_span('generate_mutations'):
-            mutated_trajectories = generate_mutations(data,
-                                                      abilities)  # TODO: limit the mutated values' decimal precision
-            # logger.debug(f'[mutate fn] Mutated trajectories: {mutated_trajectories}')
+        with tracer.start_as_current_span('case1_mutation') as case1_span:
+            success, mutated_trajectory_set = dec_speed_of_lower_collider(data, abilities) # Case 1
+            if not success:
+                case1_span.set_attribute("error", True)
+                case1_span.set_attribute("error_details", mutated_trajectory_set)
+                return json.dumps({"error": mutated_trajectory_set})   # mutated_trajectory_set is just a string message here
+            # logger.debug(f'[mutate fn] Mutated trajectories: {mutated_trajectory_set}')
+            #TODO case 2 , 3
 
         # call next function with the selected
-        with tracer.start_as_current_span('post_magic_selector') as post_magic_selector_span:
+        with tracer.start_as_current_span('post_collision_detector') as post_collision_detector_span:
+            # change origin of the data if it is 'self_report'
+            meta['origin'] = "system"
             try:
-                r = post_magic_selector(mutated_trajectories, meta)
-                post_magic_selector_span.set_attribute("response_code", r.status_code)
+                r = post_collision_detector(mutated_trajectory_set, meta)
+                post_collision_detector_span.set_attribute("response_code", r.status_code)
             except Exception as e:
-                logger.error(f'[mutate fn] Error in post_magic_selector: {e}')
-                post_magic_selector_span.set_attribute("error", True)
-                post_magic_selector_span.set_attribute("error_details", e)
+                logger.error(f'[mutate fn] Error in post_collision_detector: {e}')
+                post_collision_detector_span.set_attribute("error", True)
+                post_collision_detector_span.set_attribute("error_details", e)
 
-
-        return str({"data": mutated_trajectories})
+        return str({"data": mutated_trajectory_set})
 
 
 class Counter:
