@@ -17,10 +17,7 @@ def post_mutate(data, meta, result):
 
     payload = {
         "data": data,
-        "meta": {
-            **meta,
-            "collision": result  # FIXME unnecessary key
-        }
+        "meta": meta
     }
     logger.debug(f'[collision-detector fn] calling mutate function on {url} with payload: {payload}')
     response = requests.post(url, headers=headers, json=payload)

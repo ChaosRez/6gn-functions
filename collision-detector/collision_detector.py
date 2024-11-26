@@ -46,6 +46,7 @@ def detect_collisions(aircraft_list, time_interval, num_steps, horizontal_separa
 
     Returns:
         True if there is a conflict, False otherwise.
+        Modified aircraft_list with "collision": True key-value added to aircraft1 and aircraft2 where conflict is detected.
 
     """
     collision = False
@@ -56,6 +57,8 @@ def detect_collisions(aircraft_list, time_interval, num_steps, horizontal_separa
                 positions2 = predict_future_positions(aircraft2, time_interval, num_steps)
                 if check_for_conflict(positions1, positions2, horizontal_separation, vertical_separation):
                     collision = True
+                    aircraft1["collision"] = True  # flag them, in-place
+                    aircraft2["collision"] = True
                     break
 #                     resolve_conflict(aircraft1, aircraft2)
-    return collision
+    return collision, aircraft_list

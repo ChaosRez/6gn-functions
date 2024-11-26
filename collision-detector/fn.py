@@ -29,8 +29,8 @@ VERTICAL_SEPARATION = 300  # TODO: get parameters from ENV
 def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with trajectory set 'data' and 'meta' keys.
-    TODO output:  calls the mutate function if the collision detected, otherwise based on 'origin' metadata,
-    TODO either calls the Release function or does nothing
+    output:  calls the mutate function if the collision detected, otherwise based on 'origin' metadata,
+        either calls the Release function or does nothing
     """
     with tracer.start_as_current_span('fn') as main_span:
         main_span.set_attribute("invoke_count", Counter.increment_count())
@@ -52,7 +52,7 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
 
         # Call collision detector function with the parsed input
         with tracer.start_as_current_span('find_collisions') as collision_span:
-            collision_exists = detect_collisions(data, TIME_INTERVAL, NUM_STEPS, HORIZONTAL_SEPARATION,
+            collision_exists, flagged_data = detect_collisions(data, TIME_INTERVAL, NUM_STEPS, HORIZONTAL_SEPARATION,
                                                  VERTICAL_SEPARATION)
             collision_span.set_attribute("collision", collision_exists)
             logger.info(f'[collision-detector fn] Result of collision detection: {collision_exists}')
@@ -86,12 +86,12 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
                 logger.info("calling mutate trajectories. (unsafe)")
                 with tracer.start_as_current_span('post_mutate') as post_mutate_span:
                     try:
-                        r = post_mutate(parsed_input)
-                        decision_span.set_attribute("response_code", r.status_code)
+                        r = post_mutate(flagged_data, meta, collision_exists)
+                        post_mutate_span.set_attribute("response_code", r.status_code)
                     except Exception as e:
                         logger.error(f'[collision-detector  fn] Error in post_mutate: {e}')
-                        decision_span.set_attribute("error", True)
-                        decision_span.set_attribute("error_details", e)
+                        post_mutate_span.set_attribute("error", True)
+                        post_mutate_span.set_attribute("error_details", e)
                     return 'called mutate trajectories. (unsafe)'
 
 
