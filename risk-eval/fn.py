@@ -4,7 +4,7 @@ import json
 import typing
 import logging
 
-from call_next_func import post_threshold
+from call_next_func import post_mutate, post_release
 from timestamp_for_logger import CustomFormatter
 from tracer import TracerInitializer
 from collision_detector import detect_collisions
@@ -20,47 +20,79 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
     handler.setFormatter(CustomFormatter(handler.formatter._fmt, handler.formatter.datefmt))
 
 # Initialize the OpenTelemetry tracer
-tracer = TracerInitializer("risk-eval").tracer
+tracer = TracerInitializer("collision-detector").tracer
 
 TIME_INTERVAL = 1; NUM_STEPS = 10; HORIZONTAL_SEPARATION = 5;
-VERTICAL_SEPARATION = 300
+VERTICAL_SEPARATION = 300  # TODO: get parameters from ENV
 
 
 def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, str]]) -> typing.Optional[str]:
     """
     input: A JSON string that represents a dictionary with trajectory set 'data' and 'meta' keys.
-    output: calls the threshold function with the risk evaluation result
+    TODO output:  calls the mutate function if the collision detected, otherwise based on 'origin' metadata,
+    TODO either calls the Release function or does nothing
     """
     with tracer.start_as_current_span('fn') as main_span:
         main_span.set_attribute("invoke_count", Counter.increment_count())
         main_span.set_attribute("input", input)
-        logger.info(f'[risk-eval fn] invoke count: {str(Counter.get_count())}')
+        logger.info(f'[collision-detector fn] invoke count: {str(Counter.get_count())}')
         # Parse the JSON string into a Python list of dictionaries
         with tracer.start_as_current_span('parse_input'):
             parsed_input = json.loads(input)
-            logger.debug(f'[risk-eval fn] Parsed input: {parsed_input}')
+            logger.debug(f'[collision-detector fn] Parsed input: {parsed_input}')
 
             data = parsed_input.get('data', [])
             meta = parsed_input.get('meta', {})
 
-        # Call the sample function with the parsed input
-        with tracer.start_as_current_span('detect_collisions'):
-            # TODO: get parameters from ENV
-            result = detect_collisions(data, TIME_INTERVAL, NUM_STEPS, HORIZONTAL_SEPARATION,
-                                       VERTICAL_SEPARATION)
-            logger.info(f'[risk-eval fn] Result of collision detection: {result}')
+            # Check if 'origin' key exists in meta
+            origin = meta.get('origin', None)
+            if origin is None:
+                logger.error(f'[collision-detector fn] No origin key found in meta')
+                return 'No origin key found in meta'
 
-        # calls to :8000/threshold
-        with tracer.start_as_current_span('post_threshold') as post_threshold_span:
-            try:
-                r = post_threshold(data, meta, result)
-                post_threshold_span.set_attribute("response_code", r.status_code)
-            except Exception as e:
-                logger.error(f'[risk-eval fn] Error in post_threshold: {e}')
-                post_threshold_span.set_attribute("error", True)
-                post_threshold_span.set_attribute("error_details", e)
+        # Call collision detector function with the parsed input
+        with tracer.start_as_current_span('find_collisions') as collision_span:
+            collision_exists = detect_collisions(data, TIME_INTERVAL, NUM_STEPS, HORIZONTAL_SEPARATION,
+                                                 VERTICAL_SEPARATION)
+            collision_span.set_attribute("collision", collision_exists)
+            logger.info(f'[collision-detector fn] Result of collision detection: {collision_exists}')
 
-        return str(result)  # for debugging purposes
+        # Make a decision based on the collision detection result + origin metadata
+        # TODO move to to a separate function file
+        with tracer.start_as_current_span('final_decision',
+                                          attributes={"collision": collision_exists, "origin": origin}) as decision_span:
+            if not collision_exists:
+                if origin == 'self_report':
+                    logger.info("Do nothing. (safe and self_report)")
+                    return 'Do nothing (safe and self_report)'
+                elif origin == 'system':
+                    logger.info("calling release. (safe and from system)")
+                    with tracer.start_as_current_span('post_release') as post_release_span:
+                        try:
+                            r = post_release(parsed_input)
+                            post_release_span.set_attribute("response_code", r.status_code)
+                        except Exception as e:
+                            logger.error(f'[collision-detector  fn] Error in post_release: {e}')
+                            post_release_span.set_attribute("error", True)
+                            post_release_span.set_attribute("error_details", e)
+
+                        return 'called release (safe and from system)'
+                else:
+                    logger.error("origin is neither system nor self_report")
+                    decision_span.set_attribute("error", True)
+                    decision_span.set_attribute("error_details", "origin is neither system nor self_report")
+                    return 'origin is neither system nor self_report'
+            elif collision_exists:
+                logger.info("calling mutate trajectories. (unsafe)")
+                with tracer.start_as_current_span('post_mutate') as post_mutate_span:
+                    try:
+                        r = post_mutate(parsed_input)
+                        decision_span.set_attribute("response_code", r.status_code)
+                    except Exception as e:
+                        logger.error(f'[collision-detector  fn] Error in post_mutate: {e}')
+                        decision_span.set_attribute("error", True)
+                        decision_span.set_attribute("error_details", e)
+                    return 'called mutate trajectories. (unsafe)'
 
 
 class Counter:
