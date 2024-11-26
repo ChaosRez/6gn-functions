@@ -28,6 +28,7 @@ def check_for_conflict(positions1, positions2, horizontal_separation, vertical_s
 #     If a conflict is detected, initiate conflict resolution measures, such as changing altitude, direction, or speed.
 #     """
 #     # TODO Implement conflict resolution strategy, e.g., change altitude or direction
+#     #  This is mutate function's responsibility
 #     pass
 
 
@@ -44,17 +45,17 @@ def detect_collisions(aircraft_list, time_interval, num_steps, horizontal_separa
         vertical_separation: critical vertical distance for conflict detection
 
     Returns:
-         float: 0.0 if no conflict, 1.0 if there is a conflict
+        True if there is a conflict, False otherwise.
 
     """
-    no_conflict = True
+    collision = False
     for i, aircraft1 in enumerate(aircraft_list):
         positions1 = predict_future_positions(aircraft1, time_interval, num_steps)
         for j, aircraft2 in enumerate(aircraft_list):
             if i < j:
                 positions2 = predict_future_positions(aircraft2, time_interval, num_steps)
                 if check_for_conflict(positions1, positions2, horizontal_separation, vertical_separation):
-                    no_conflict = False
+                    collision = True
                     break
 #                     resolve_conflict(aircraft1, aircraft2)
-    return 0.0 if no_conflict else 1.0
+    return collision
