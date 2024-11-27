@@ -55,7 +55,7 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
             collision_exists, flagged_data = detect_collisions(data, TIME_INTERVAL, NUM_STEPS, HORIZONTAL_SEPARATION,
                                                  VERTICAL_SEPARATION)
             collision_span.set_attribute("collision", collision_exists)
-            logger.info(f'[collision-detector fn] Result of collision detection: {collision_exists}')
+            logger.debug(f'[collision-detector fn] Result of collision detection: {collision_exists}')
 
         # Make a decision based on the collision detection result + origin metadata
         # TODO move to to a separate function file
