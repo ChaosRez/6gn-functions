@@ -5,7 +5,7 @@ import typing
 import logging
 import uuid
 
-from call_next_func import post_risk_eval
+from call_next_func import post_collision_detector
 from timestamp_for_logger import CustomFormatter
 from tracer import TracerInitializer
 from get_recent_trajectories import get_recent_trajectories
@@ -94,7 +94,7 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
                     with tracer.start_as_current_span('json_encode_recent_trajectories'):
                         encoded_recent_trajectories = [JSONEncoder().default(trajectory) for trajectory in recent_trajectories]
                     try:
-                        r = post_risk_eval(encoded_recent_trajectories, meta)
+                        r = post_collision_detector(encoded_recent_trajectories, meta)
                         post_risk_eval_span.set_attribute("response_code", r.status_code)
                     except Exception as e:
                         logger.error(f'[trigger fn] Error in post_risk_eval: {e}')
