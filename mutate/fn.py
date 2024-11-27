@@ -7,7 +7,7 @@ import logging
 from call_next_func import post_collision_detector
 from timestamp_for_logger import CustomFormatter
 from tracer import TracerInitializer
-from mutate import generate_mutations, dec_speed_of_lower_collider
+from mutate import dec_speed_of_lower_collider, change_dir_of_lower_collider
 
 # Set up Python logger. milliseconds are not supported by default
 logging.basicConfig(
@@ -49,9 +49,10 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
             data = parsed_input.get('data', [])
             meta = parsed_input.get('meta', {})
 
-        # (check &) increment the number of mutations
+        # (check &) increment the number of mutations (guard clauses)
         with tracer.start_as_current_span('process_mutate_count', attributes={"origin": meta.get('origin'),
-                                                                              "mutations": meta.get('mutations', None)}) as process_mutate_count_span:
+                                                                              "mutations": meta.get('mutations',
+                                                                                                    None)}) as process_mutate_count_span:
             if 'mutations' in meta and meta['origin'] == 'system':  # previously mutated
                 logger.info(f"[mutate fn] the trajectory was mutated {meta['mutations']} time(s).")
                 if meta['mutations'] > MAX_MUTATIONS:
@@ -68,20 +69,40 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
                 logger.fatal(msg)
                 return msg  # guard clause
 
-        # collection of mutate trajectories (candidates)
-        with tracer.start_as_current_span('case1_mutation') as case1_span:
-            success, mutated_trajectory_set = dec_speed_of_lower_collider(data, abilities) # Case 1
-            if not success:
-                case1_span.set_attribute("error", True)
-                case1_span.set_attribute("error_details", mutated_trajectory_set)
-                return json.dumps({"error": mutated_trajectory_set})   # mutated_trajectory_set is just a string message here
-            # logger.debug(f'[mutate fn] Mutated trajectories: {mutated_trajectory_set}')
-            #TODO case 2 , 3
+        # apply mutation cases
+        with tracer.start_as_current_span('mutation') as mutation_cases_span:
+            mutation_cases_str = meta.get('mutation_cases', '000')  # replace with bin 000 if None
+            logger.info(f"[mutate fn] mutation_cases: {mutation_cases_str}")
+            mutation_cases = int(mutation_cases_str, 2)  # parse as binary
+
+            if mutation_cases == 0:
+                with tracer.start_as_current_span('case1_mutation') as case1_span:
+                    success, mutated_trajectory_set = dec_speed_of_lower_collider(data, abilities)  # Case 1
+                    if not success:
+                        case1_span.set_attribute("error", True)
+                        case1_span.set_attribute("error_details", mutated_trajectory_set)
+                        return json.dumps(
+                            {"error": mutated_trajectory_set})  # mutated_trajectory_set is just a string message here
+                    updated_mutation_cases = mutation_cases | 0b001  # set the first bit to 1
+            elif mutation_cases == 0b001:  # mutation_cases & 0b011 == 1
+                with tracer.start_as_current_span('case2_mutation') as case2_span:
+                    success, mutated_trajectory_set = change_dir_of_lower_collider(data, abilities)
+                    if not success:
+                        case2_span.set_attribute("error", True)
+                        case2_span.set_attribute("error_details", mutated_trajectory_set)
+                        return json.dumps(
+                            {"error": mutated_trajectory_set})  # mutated_trajectory_set is just a string message here
+                    updated_mutation_cases = mutation_cases | 0b010  # set the second bit to 1
+            else:
+                # TODO: Add case 3 mutations here
+                logger.error(f"[mutate fn] mutation_cases: {mutation_cases_str} - not implemented")
+                mutation_cases_span.set_attribute("mutation_cases", mutation_cases_str)
+                return json.dumps({"error": f"mutation_cases: {mutation_cases_str} - not implemented"})
 
         # call next function with the selected
         with tracer.start_as_current_span('post_collision_detector') as post_collision_detector_span:
-            # change origin of the data if it is 'self_report'
-            meta['origin'] = "system"
+            meta['origin'] = "system"  # change origin of the data if it is 'self_report'
+            meta['mutation_cases'] = f'{updated_mutation_cases:03b}'  # convert back to binary string
             try:
                 r = post_collision_detector(mutated_trajectory_set, meta)
                 post_collision_detector_span.set_attribute("response_code", r.status_code)
