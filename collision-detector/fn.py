@@ -22,7 +22,7 @@ for handler in logging.getLogger().handlers:  # Apply the custom formatter to th
 # Initialize the OpenTelemetry tracer
 tracer = TracerInitializer("collision-detector").tracer
 
-TIME_INTERVAL = 1; NUM_STEPS = 10; HORIZONTAL_SEPARATION = 5;
+TIME_INTERVAL = 1; NUM_STEPS = 10; HORIZONTAL_SEPARATION = 1;  # https://trello.com/c/jVdQwhcZ/901-6gn-fix-collision-detection-detects-false-collisions
 VERTICAL_SEPARATION = 300  # TODO: get parameters from ENV
 
 

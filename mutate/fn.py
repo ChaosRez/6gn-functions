@@ -49,6 +49,7 @@ def fn(input: typing.Optional[str], headers: typing.Optional[typing.Dict[str, st
             data = parsed_input.get('data', [])
             meta = parsed_input.get('meta', {})
 
+        # TODO: merge MAX_MUTATIONS check with "mutation cases"?
         # (check &) increment the number of mutations (guard clauses)
         with tracer.start_as_current_span('process_mutate_count', attributes={"origin": meta.get('origin'),
                                                                               "mutations": meta.get('mutations',
