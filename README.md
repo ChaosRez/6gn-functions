@@ -6,7 +6,7 @@ This repository contains the serverless functions for the 6gNext anti-collision 
 
 The system is implemented as a serverless function chain, where each function is responsible for a specific task. The functions are written in Python and designed to run on the [tinyFaaS](https://github.com/OpenFogStack/tinyFaaS) platform, a lightweight serverless framework that runs functions in containers.
 
-The functions integrate with Kafka/Mosquitto, MongoDB, and Jaeger for tracing. An ingester service receives MAVLink messages from UAVs and triggers the function chain.
+The functions integrate with Kafka/Mosquitto, MongoDB, and Jaeger for tracing. An [ingester](https://github.com/ChaosRez/6gn-ingester) service receives MAVLink messages from UAVs and triggers the function chain.
 
 ## Serverless Architecture
 
