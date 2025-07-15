@@ -105,7 +105,7 @@ git clone https://github.com/OpenFogStack/tinyFaaS.git
 ## Run services
 run kafka, jaeger, mongodb, and Ingester vias `docker compose`.
 Note that Kafka advertised address should be the public IP of the server.
-Also, the 'ingester' service should be modified to use the public IP of Kafka.
+Also, the '[ingester](https://github.com/ChaosRez/6gn-ingester)' service should be modified to use the public IP of Kafka.
 ```bash
 mkdir 6gn && cd 6gn
 nvim docker-compose.yml
