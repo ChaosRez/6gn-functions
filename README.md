@@ -1,6 +1,6 @@
 # Anti-Collision System for Drones: Serverless Functions
 
-> **Note:** This is an early prototype of the anti-collision system and is not ready for production use. The project is currently archived.
+> **Note:** This is an early prototype of the anti-collision system (and TUB services) and is not ready for production use. The project is currently archived.
 
 This repository contains the serverless functions for the 6gNext anti-collision system for drones. It is designed to be used for the [6gNext project](https://6gnext.de/?page_id=524).
 
