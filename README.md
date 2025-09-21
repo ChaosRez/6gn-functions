@@ -123,6 +123,20 @@ The UAV clients should use a QoS level of 0 for sending updates. But the Release
 -   **Security:** The default configurations for MongoDB and Mosquitto are not secure. You should enable authentication and authorization for production environments. The tinyFaaS functions are not intended to be exposed to the public internet.
 -   **Performance:** By default, tracing is configured with `sampling.always_on`, which sends all trace samples to Jaeger. This can be costly and should be adjusted for production use by changing the sampling rate or disabling it.
 
+## Running with Simulation
+
+For testing and development purposes, you can use the [Skybed](https://github.com/jan-be/skybed) to simulate multiple UAVs and test the serverless anti-collision system without physical drones.
+
+Skybed allows you to:
+
+- Test the anti-collision system with multiple UAVs (up to 200+ simultaneous drones)
+- Simulate various collision scenarios and flight patterns
+- Validate function chain performance under load
+- Debug the system behavior in controlled conditions
+
+![200 UAVs Simulation](200_uavs_screenshot.png)
+
+
 ## Copyright Notice
 
 This project is owned by TU Berlin. For any usage, modifications, or distribution, please contact the project maintainer at `mm@3s.tu-berlin.de`. All rights reserved.
